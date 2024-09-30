@@ -1,0 +1,121 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+import pandas as pd
+import numpy as np
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+#Source: https://en.wikipedia.org/wiki/Apriori_algorithm - turned the pseudo code here into code
+
+
+# In[2]:
+
+
+# Read the text file into a DataFrame
+df = pd.read_csv('browsing.txt', delimiter='\t', header = None)
+baskets = list(df[0])
+
+
+# In[4]:
+
+
+#Here we want to get L1 to use in our second pass (the pairs pass) L1 is items with support
+counts_tracker = {}        
+for basket in baskets:
+    items = basket.strip().split(" ")
+    for item in items:
+        if item in counts_tracker:
+            counts_tracker[item] += 1
+        else:
+            counts_tracker[item] = 1
+
+L1 = {key: value for key, value in counts_tracker.items() if value > 100}
+
+
+# In[5]:
+
+
+#Get L2 and get confidence by pulling counts from L1, then create df to display results
+counts_tracker = {}
+for basket in baskets:
+    items = basket.strip().split(" ")
+    for item1 in range(len(items)):
+        for item2 in range(item1 + 1, len(items)):
+            if (items[item1] in L1) and (items[item2] in L1):
+                pair = tuple(sorted([items[item1], items[item2]]))
+                if pair in counts_tracker:
+                    counts_tracker[pair] += 1
+                else:
+                    counts_tracker[pair] = 1
+                    
+
+L2 = {key: value for key, value in counts_tracker.items() if value > 100}
+
+confidence_list = []
+for pair, count in L2.items():
+    itemA = pair[0]
+    itemB = pair[1]
+    confAtoB = count / L1[itemA]
+    confidence_list.append([itemA, itemB, confAtoB])
+    confBtoA = count / L1[itemB]
+    confidence_list.append([itemB, itemA, confBtoA])
+    
+pairs_data = {'Antecedent': [i[0] for i in confidence_list],
+        'Consequent': [i[1] for i in confidence_list],
+        'Confidence': [i[2] for i in confidence_list]}
+
+pairs_df = pd.DataFrame(pairs_data)
+
+pairs_df = pairs_df.sort_values(by = ['Confidence'], ascending = False)
+pairs_df.head()
+
+
+# In[6]:
+
+
+#For triples, check the three pairs agains L2
+counts_tracker = {}
+
+for basket in baskets:
+    items = basket.strip().split(" ")
+    for item1 in range(len(items)):
+        for item2 in range(item1 + 1, len(items)):
+            for item3 in range(item2 + 1, len(items)):
+                triple = tuple(sorted([items[item1], items[item2], items[item3]]))
+                pair1 = (triple[0], triple[1])
+                pair2 = (triple[0], triple[2])
+                pair3 = (triple[1], triple[2])
+                if (pair1 in L2) and (pair2 in L2) and (pair3 in L2):
+                    if triple in counts_tracker:
+                        counts_tracker[triple] += 1
+                    else:
+                        counts_tracker[triple] = 1
+                
+
+L3 = {key: value for key, value in counts_tracker.items() if value > 100}
+
+
+confidence_list = []
+for triple, count in L3.items():
+    itemA = triple[0]
+    itemB = triple[1]
+    itemC = triple[2]
+    confABtoC = count / L2[(itemA,itemB)]
+    confidence_list.append([itemA +', ' + itemB, itemC, confABtoC])
+    confACtoB = count / L2[(itemA,itemC)]
+    confidence_list.append([itemA +', ' + itemC, itemB, confACtoB])  
+    confBCtoA = count / L2[(itemB,itemC)]
+    confidence_list.append([itemB +', ' + itemC, itemA, confBCtoA])
+    
+triples_data = {'Antecedents': [i[0] for i in confidence_list],
+        'Consequent': [i[1] for i in confidence_list],
+        'Confidence': [i[2] for i in confidence_list]}
+
+triples_df = pd.DataFrame(triples_data)
+
+triples_df = triples_df.sort_values(by = ['Confidence', 'Antecedents'], ascending = [False, True])
+triples_df.head()
+
